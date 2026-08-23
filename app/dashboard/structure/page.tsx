@@ -46,8 +46,13 @@ export default function StructurePage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Database size={20} style={{ color: "var(--accent-blue)" }} />
+          <div className="flex items-center gap-2.5 mb-1">
+            <div
+              className="p-1.5 rounded-lg"
+              style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)" }}
+            >
+              <Database size={16} style={{ color: "var(--accent-cyan)" }} />
+            </div>
             <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
               Table Structure
             </h1>
@@ -118,16 +123,16 @@ export default function StructurePage() {
               key={col.name}
               className="glass-card p-5 fade-in-up"
               style={{
-                borderLeft: "3px solid var(--accent-blue)",
+                borderLeft: "2px solid rgba(34,211,238,0.4)",
                 transition: "transform 0.15s, box-shadow 0.15s",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(74,125,255,0.12)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(34,211,238,0.1), 0 0 0 1px rgba(34,211,238,0.15)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                (e.currentTarget as HTMLElement).style.boxShadow = "";
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-3">
@@ -140,9 +145,10 @@ export default function StructurePage() {
                 <span
                   className="text-xs shrink-0 px-1.5 py-0.5 rounded"
                   style={{
-                    background: "rgba(74,125,255,0.1)",
-                    color: "var(--accent-blue)",
+                    background: "rgba(34,211,238,0.08)",
+                    color: "var(--accent-cyan)",
                     fontFamily: "var(--font-geist-mono)",
+                    border: "1px solid rgba(34,211,238,0.2)",
                   }}
                 >
                   #{col.position}
