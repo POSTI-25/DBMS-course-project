@@ -1,24 +1,34 @@
 // src/scripts/init-db.js
 // Run with: node src/scripts/init-db.js
-// Make sure to set your DB env variables first.
+
+require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: '.env' }); // fallback
 
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  host: process.env.PGHOST || 'localhost',
-  port: Number(process.env.PGPORT) || 5432,
-  database: process.env.PGDATABASE || 'stellar_archive',
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'postgres',
-});
+// Use DATABASE_URL if present, otherwise fall back to individual PG* vars
+const pool = process.env.DATABASE_URL
+  ? new Pool({ connectionString: process.env.DATABASE_URL })
+  : new Pool({
+      host: process.env.PGHOST || 'localhost',
+      port: Number(process.env.PGPORT) || 5432,
+      database: process.env.PGDATABASE || 'stellar_archive',
+      user: process.env.PGUSER || 'postgres',
+      password: process.env.PGPASSWORD || 'postgres',
+    });
 
 async function init() {
   const client = await pool.connect();
   try {
     console.log('Connected to database. Initializing schema...');
 
+    // Drop in reverse dependency order so FK constraints don't block drops
+    await client.query('DROP TABLE IF EXISTS observations CASCADE;');
+    await client.query('DROP TABLE IF EXISTS celestial_bodies CASCADE;');
+    await client.query('DROP TABLE IF EXISTS users CASCADE;');
+
     await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         user_id   SERIAL PRIMARY KEY,
         username  VARCHAR(100) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
@@ -28,19 +38,19 @@ async function init() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS celestial_bodies (
+      CREATE TABLE celestial_bodies (
         body_id       SERIAL PRIMARY KEY,
         name          VARCHAR(150) NOT NULL,
         spectral_type VARCHAR(20),
-        mass          NUMERIC(20, 4),
-        distance_ly   NUMERIC(15, 4),
+        mass          DOUBLE PRECISION,
+        distance_ly   DOUBLE PRECISION,
         constellation VARCHAR(100),
         discovered_at DATE
       );
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS observations (
+      CREATE TABLE observations (
         obs_id      SERIAL PRIMARY KEY,
         body_id     INTEGER NOT NULL REFERENCES celestial_bodies(body_id) ON DELETE CASCADE,
         observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
