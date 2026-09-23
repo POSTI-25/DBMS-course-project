@@ -34,3 +34,14 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+backend starting command - 
+node src/scripts/init-db.js
+
+start postgresql -
+
+Press the Windows Key + R to open the Run dialog.
+Type services.msc and hit Enter.
+Scroll down the list until you find PostgreSQL (it usually looks something like postgresql-x64-16 or whichever version you installed).
+Right-click it and select Start (or "Restart" if it seems stuck).
