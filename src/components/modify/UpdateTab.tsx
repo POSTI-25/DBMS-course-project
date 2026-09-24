@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 import QueryToast, { QueryResult } from "@/components/QueryToast";
 
@@ -32,20 +32,39 @@ export default function UpdateTab({ table }: { table: Table }) {
   const [rows, setRows]       = useState<Record<string,unknown>[]>([]);
   const [loadingRows, setLR]  = useState(false);
   const [selectedPk, setSel]  = useState<string>("");
+  const [lookupId, setLookupId] = useState("");
   const [form, setForm]       = useState<Record<string,string>>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult]   = useState<QueryResult|null>(null);
 
-  const fetchRows = async () => {
+  const fetchRows = useCallback(async () => {
     setLR(true);
     try {
-      const r = await fetch(`/api/tables/${table}/contents`);
+      const r = await fetch(`/api/tables/${table}/contents?pageSize=100`);
       const j = await r.json();
       setRows(j.rows ?? []);
     } finally { setLR(false); }
-  };
+  }, [table]);
 
-  useEffect(() => { fetchRows(); }, [table]);
+  useEffect(() => { const timer = setTimeout(() => { void fetchRows(); }, 0); return () => clearTimeout(timer); }, [fetchRows]);
+
+  const loadId = async () => {
+    if (!/^\d+$/.test(lookupId) || Number(lookupId) < 1) { setResult({ success:false, message:"Enter a valid record ID." }); return; }
+    try {
+      const response = await fetch(`/api/tables/${table}/contents?id=${lookupId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Lookup failed.");
+      if (!data.rows.length) throw new Error("Record not found.");
+      setRows(previous => [...previous.filter(row => String(row[pkCol]) !== lookupId), data.rows[0]]);
+      setSel(lookupId);
+      const next: Record<string,string> = {};
+      for (const field of fields) {
+        const value = data.rows[0][field.name];
+        next[field.name] = value == null ? "" : field.type === "datetime-local" ? String(value).slice(0,16) : field.type === "date" ? String(value).slice(0,10) : String(value);
+      }
+      setForm(next); setResult(null);
+    } catch (error) { setResult({ success:false, message:error instanceof Error ? error.message : "Lookup failed." }); }
+  };
 
   const pick = (pkVal: string) => {
     setSel(pkVal); setResult(null);
@@ -107,6 +126,8 @@ export default function UpdateTab({ table }: { table: Table }) {
           <RefreshCw size={14} className={loadingRows?"animate-spin":""} />
         </button>
       </div>
+
+      <div className="flex gap-2"><input className="stellar-input" aria-label="Load record by ID" type="number" min="1" placeholder="Or enter a record ID" value={lookupId} onChange={e=>setLookupId(e.target.value)} /><button type="button" className="btn-primary" onClick={loadId}>Load ID</button></div>
 
       {/* SQL preview */}
       <div className="p-3 rounded-lg" style={{background:"rgba(34,211,238,0.04)",border:"1px solid rgba(34,211,238,0.12)"}}>

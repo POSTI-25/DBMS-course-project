@@ -1,18 +1,18 @@
 "use client";
 
-import { Star, LogOut, Shield, User, Activity } from "lucide-react";
+import { Star, LogOut, Shield, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import type { Session } from "@/lib/session";
 
-const SESSION = {
-  roleId: 1,
-  userId: 7,
-  username: "admin",
-  roleName: "Admin",
-};
-
-export default function Topbar() {
+export default function Topbar({ session }: { session: Session }) {
+  const router = useRouter();
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login"); router.refresh();
+  }
   return (
     <header
-      className="sticky top-0 z-50 flex items-center justify-between px-6 py-3"
+      className="topbar sticky top-0 z-50 flex items-center justify-between px-6 py-3"
       style={{
         background: "rgba(2,4,14,0.80)",
         borderBottom: "1px solid rgba(34,211,238,0.18)",
@@ -47,36 +47,15 @@ export default function Topbar() {
 
       {/* ── Right cluster ──────────────────────── */}
       <div className="flex items-center gap-3">
-        {/* Live connection pill */}
-        <div
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full"
-          style={{
-            background: "rgba(34,197,94,0.08)",
-            border: "1px solid rgba(34,197,94,0.25)",
-          }}
-        >
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "#4ade80", boxShadow: "0 0 6px #4ade80" }}
-          />
-          <Activity size={12} style={{ color: "#4ade80" }} />
-          <span className="text-[11px] font-medium" style={{ color: "#86efac" }}>
-            PostgreSQL · Live
-          </span>
-        </div>
-
-        {/* Divider */}
-        <div className="h-5 w-px" style={{ background: "rgba(34,211,238,0.15)" }} />
-
         {/* Role / User badges */}
         <div className="hidden md:flex items-center gap-2">
           <span className="badge badge-purple">
             <Shield size={10} />
-            Role {SESSION.roleId}
+            {session.roleId === 1 ? "Administrator" : "Viewer"}
           </span>
           <span className="badge badge-cyan">
             <User size={10} />
-            UID {SESSION.userId}
+            UID {session.userId}
           </span>
         </div>
 
@@ -95,10 +74,10 @@ export default function Topbar() {
               boxShadow: "0 0 10px rgba(74,125,255,0.4)",
             }}
           >
-            {SESSION.username[0].toUpperCase()}
+            {session.username[0].toUpperCase()}
           </div>
           <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-            {SESSION.username}
+            {session.username}
           </span>
         </div>
 
@@ -106,7 +85,7 @@ export default function Topbar() {
         <button
           className="btn-danger"
           style={{ padding: "7px 13px", fontSize: "0.78rem" }}
-          onClick={() => alert("Session terminated.")}
+          onClick={logout}
           id="btn-logoff"
         >
           <LogOut size={13} />

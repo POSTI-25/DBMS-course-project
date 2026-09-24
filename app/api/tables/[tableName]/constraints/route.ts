@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { requireApiSession } from "@/lib/session";
 
 // Allowlist to prevent SQL injection through table names
 const ALLOWED_TABLES = ["users", "celestial_bodies", "observations"];
@@ -7,6 +8,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ tableName: string }> }
 ) {
+  const denied = await requireApiSession();
+  if (denied) return denied;
   const { tableName } = await params;
 
   if (!ALLOWED_TABLES.includes(tableName)) {
@@ -32,10 +35,21 @@ export async function GET(
        ORDER BY ordinal_position`,
       [tableName]
     );
+    const constraints = await pool.query(
+      `SELECT c.conname AS name,
+              CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'f' THEN 'FOREIGN KEY'
+                WHEN 'u' THEN 'UNIQUE' WHEN 'c' THEN 'CHECK' ELSE c.contype::text END AS type,
+              pg_get_constraintdef(c.oid) AS definition
+       FROM pg_constraint c
+       JOIN pg_class t ON t.oid = c.conrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname = 'public' AND t.relname = $1
+       ORDER BY c.contype, c.conname`, [tableName]
+    );
 
-    return Response.json({ columns: result.rows });
+    return Response.json({ columns: result.rows, constraints: constraints.rows });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("Schema query failed", err);
+    return Response.json({ error: "Unable to load schema." }, { status: 500 });
   }
 }

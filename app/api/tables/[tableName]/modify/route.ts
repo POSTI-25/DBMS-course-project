@@ -32,6 +32,7 @@
  */
 
 import pool from "@/lib/db";
+import { requireApiSession } from "@/lib/session";
 
 // ── Security: Table Allowlist ────────────────────────────────────────────────
 //
@@ -76,6 +77,25 @@ const INSERTABLE_COLS: Record<AllowedTable, string[]> = {
   observations:     ["body_id", "observed_at", "notes", "observer", "instrument"],
 };
 
+function invalidFields(table: AllowedTable, values: Record<string, unknown>) {
+  for (const [key, value] of Object.entries(values)) {
+    if (typeof value === "number" && !Number.isFinite(value)) return `${key} must be a finite number.`;
+    if (["mass", "distance_ly"].includes(key) && value !== null && (typeof value !== "number" || value < 0)) return `${key} must be a non-negative number.`;
+    if (key === "body_id" && value !== null && (!Number.isSafeInteger(Number(value)) || Number(value) < 1)) return "body_id must be a positive integer.";
+    if (typeof value === "string" && ["name", "observer", "instrument", "constellation", "spectral_type"].includes(key) && value.length > ({ name: 150, observer: 100, instrument: 150, constellation: 100, spectral_type: 20 } as Record<string, number>)[key]) return `${key} is too long.`;
+  }
+  if (table === "celestial_bodies" && "name" in values && (typeof values.name !== "string" || !values.name.trim())) return "Name is required.";
+  return null;
+}
+
+function databaseError(error: unknown) {
+  const code = (error as { code?: string }).code;
+  if (code === "23503") return Response.json({ error: "Referenced celestial body does not exist." }, { status: 400 });
+  if (code === "23502" || code === "23514" || code === "22007" || code === "22P02") return Response.json({ error: "Invalid record values. Check required fields, dates, and numeric ranges." }, { status: 400 });
+  console.error("Record modification failed", error);
+  return Response.json({ error: "Database operation failed." }, { status: 500 });
+}
+
 function isAllowed(t: string): t is AllowedTable {
   return (ALLOWED_TABLES as readonly string[]).includes(t);
 }
@@ -109,6 +129,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ tableName: string }> }
 ) {
+  const denied = await requireApiSession(true);
+  if (denied) return denied;
   const { tableName } = await resolveParams(params);
   if (!isAllowed(tableName))
     return Response.json({ error: `Inserts into "${tableName}" are not allowed.` }, { status: 400 });
@@ -117,6 +139,7 @@ export async function POST(
   try { body = await req.json(); } catch {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ error: "Invalid request." }, { status: 400 });
 
   // Filter to only allowed, non-empty columns sent by the client
   const allowed = INSERTABLE_COLS[tableName];
@@ -126,6 +149,8 @@ export async function POST(
 
   if (cols.length === 0)
     return Response.json({ error: "No valid fields provided." }, { status: 400 });
+  const invalidInsert = invalidFields(tableName, Object.fromEntries(cols.map(col => [col, body[col]])));
+  if (invalidInsert) return Response.json({ error: invalidInsert }, { status: 400 });
 
   // PRESENTATION POINT — NOT NULL Constraint (application-level enforcement)
   // Before hitting the DB, we check the NOT NULL columns ourselves so we can
@@ -151,9 +176,7 @@ export async function POST(
       { success: true, row: result.rows[0], rowsAffected: result.rowCount, queryTime: Date.now() - start },
       { status: 201 }  // 201 Created
     );
-  } catch (err: unknown) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
-  }
+  } catch (err: unknown) { return databaseError(err); }
 }
 
 // =============================================================================
@@ -182,6 +205,8 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ tableName: string }> }
 ) {
+  const denied = await requireApiSession(true);
+  if (denied) return denied;
   const { tableName } = await resolveParams(params);
   if (!isAllowed(tableName))
     return Response.json({ error: `Updates on "${tableName}" are not allowed.` }, { status: 400 });
@@ -190,6 +215,7 @@ export async function PUT(
   try { body = await req.json(); } catch {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ error: "Invalid request." }, { status: 400 });
 
   // PRESENTATION POINT — Primary Key required for UPDATE
   // We must know WHICH row to update. The client sends the PK value alongside
@@ -198,6 +224,7 @@ export async function PUT(
   const pkVal = body[pkCol];
   if (pkVal === undefined || pkVal === null || pkVal === "")
     return Response.json({ error: `Primary key "${pkCol}" is required.` }, { status: 400 });
+  if (!Number.isSafeInteger(Number(pkVal)) || Number(pkVal) < 1) return Response.json({ error: "Invalid primary key." }, { status: 400 });
 
   const allowed = UPDATABLE_COLS[tableName];
   const setCols = Object.keys(body).filter(
@@ -206,6 +233,8 @@ export async function PUT(
 
   if (setCols.length === 0)
     return Response.json({ error: "No updatable fields provided." }, { status: 400 });
+  const invalidUpdate = invalidFields(tableName, Object.fromEntries(setCols.map(col => [col, body[col] === "" ? null : body[col]])));
+  if (invalidUpdate) return Response.json({ error: invalidUpdate }, { status: 400 });
 
   // Build SET clause: "name" = $1, "mass" = $2
   // PK goes in as the LAST parameter: WHERE "body_id" = $N
@@ -221,9 +250,7 @@ export async function PUT(
     return Response.json(
       { success: true, row: result.rows[0], rowsAffected: result.rowCount, queryTime: Date.now() - start }
     );
-  } catch (err: unknown) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
-  }
+  } catch (err: unknown) { return databaseError(err); }
 }
 
 // =============================================================================
@@ -252,6 +279,8 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ tableName: string }> }
 ) {
+  const denied = await requireApiSession(true);
+  if (denied) return denied;
   const { tableName } = await resolveParams(params);
   if (!isAllowed(tableName))
     return Response.json({ error: `Deletes on "${tableName}" are not allowed.` }, { status: 400 });
@@ -260,12 +289,14 @@ export async function DELETE(
   try { body = await req.json(); } catch {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ error: "Invalid request." }, { status: 400 });
 
   // PRESENTATION POINT — Primary Key required for DELETE (same reason as UPDATE)
   const pkCol = PK[tableName];
   const pkVal = body[pkCol];
   if (pkVal === undefined || pkVal === null || pkVal === "")
     return Response.json({ error: `Primary key "${pkCol}" is required.` }, { status: 400 });
+  if (!Number.isSafeInteger(Number(pkVal)) || Number(pkVal) < 1) return Response.json({ error: "Invalid primary key." }, { status: 400 });
 
   // Simple single-parameter DELETE — only $1 needed (the PK value)
   const sql = `DELETE FROM "${tableName}" WHERE "${pkCol}" = $1 RETURNING *`;
@@ -278,7 +309,5 @@ export async function DELETE(
     return Response.json(
       { success: true, row: result.rows[0], rowsAffected: result.rowCount, queryTime: Date.now() - start }
     );
-  } catch (err: unknown) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
-  }
+  } catch (err: unknown) { return databaseError(err); }
 }

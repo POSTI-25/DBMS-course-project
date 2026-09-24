@@ -35,7 +35,7 @@ export default function ModifyPage() {
           <h1 className="text-xl font-bold" style={{color:"var(--text-primary)"}}>Modify Database</h1>
         </div>
         <p className="text-sm" style={{color:"var(--text-muted)"}}>
-          Execute INSERT, UPDATE, DELETE, or raw SQL against the stellar archive
+          Manage records with safe forms and explore data with read-only SQL
         </p>
       </div>
 

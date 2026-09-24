@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   LayoutGrid,
@@ -39,38 +39,40 @@ function formatCell(value: unknown): string {
 function ContentsInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialTable = (searchParams.get("table") as TableName) || "celestial_bodies";
-
-  const [selectedTable, setSelectedTable] = useState<TableName>(initialTable);
+  const requestedTable = searchParams.get("table");
+  const selectedTable: TableName = TABLES.includes(requestedTable as TableName) ? requestedTable as TableName : "celestial_bodies";
+  const [page, setPage] = useState(1);
   const [data, setData]         = useState<TableData | null>(null);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [fetchTime, setFetchTime] = useState<number | null>(null);
+  const requestId = useRef(0);
 
   // Telemetry drawer
   const [activeRow, setActiveRow] = useState<TelemetryRow | null>(null);
 
-  const fetchData = useCallback(async (table: TableName) => {
+  const fetchData = useCallback(async (table: TableName, requestedPage: number) => {
+    const current = ++requestId.current;
     setLoading(true);
     setError(null);
     const start = Date.now();
     try {
-      const res = await fetch(`/api/tables/${table}/contents`);
+      const res = await fetch(`/api/tables/${table}/contents?page=${requestedPage}&pageSize=25`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to fetch");
-      setData(json);
-      setFetchTime(Date.now() - start);
+      if (current === requestId.current) { setData(json); setFetchTime(Date.now() - start); }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "An unknown error occurred.");
+      if (current === requestId.current) setError(e instanceof Error ? e.message : "An unknown error occurred.");
     } finally {
-      setLoading(false);
+      if (current === requestId.current) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchData(selectedTable); }, [selectedTable, fetchData]);
+  useEffect(() => { const timer = setTimeout(() => { void fetchData(selectedTable, page); }, 0); return () => clearTimeout(timer); }, [selectedTable, page, fetchData]);
 
   const handleTableChange = (t: TableName) => {
-    setSelectedTable(t);
+    setPage(1);
+    setData(null);
     setActiveRow(null);
     router.push(`/dashboard/contents?table=${t}`, { scroll: false });
   };
@@ -105,6 +107,7 @@ function ContentsInner() {
           {/* Table selector */}
           <div className="relative">
             <select
+              aria-label="Select table"
               id="select-table"
               value={selectedTable}
               onChange={(e) => handleTableChange(e.target.value as TableName)}
@@ -125,7 +128,7 @@ function ContentsInner() {
           {/* Refresh */}
           <button
             id="btn-refresh-contents"
-            onClick={() => fetchData(selectedTable)}
+            onClick={() => fetchData(selectedTable, page)}
             disabled={loading}
             className="btn-primary"
             style={{ padding: "10px 16px" }}
@@ -242,8 +245,11 @@ function ContentsInner() {
                     const isSelected = activeRow === row;
                     return (
                       <tr
-                        key={i}
+                        key={String(row[selectedTable === "users" ? "user_id" : selectedTable === "observations" ? "obs_id" : "body_id"])}
                         onClick={() => setActiveRow(isSelected ? null : row)}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveRow(isSelected ? null : row); } }}
+                        tabIndex={0}
+                        aria-label={`Inspect row ${(page - 1) * 25 + i + 1}`}
                         style={{
                           background: isSelected
                             ? "rgba(34,211,238,0.06)"
@@ -255,7 +261,7 @@ function ContentsInner() {
                       >
                         {/* Row number */}
                         <td style={{ color: "var(--text-muted)", width: 36, fontSize: "0.72rem" }}>
-                          {i + 1}
+                          {(page - 1) * 25 + i + 1}
                         </td>
 
                         {/* Celestial badge cell */}
@@ -298,6 +304,8 @@ function ContentsInner() {
           </div>
         )}
       </div>
+
+      {data && !loading && !error && data.count !== null && data.count > 25 && <nav className="pagination" aria-label="Table pages"><span>Showing {(page - 1) * 25 + 1}–{Math.min(page * 25, data.count)} of {data.count}</span><div><button className="btn-primary" disabled={page === 1} onClick={() => { setPage(value => value - 1); setActiveRow(null); }}>Previous</button><span>Page {page} of {Math.ceil(data.count / 25)}</span><button className="btn-primary" disabled={page >= Math.ceil(data.count / 25)} onClick={() => { setPage(value => value + 1); setActiveRow(null); }}>Next</button></div></nav>}
 
       {/* ── Telemetry Drawer ──────────────────────────────────────── */}
       <TelemetryDrawer

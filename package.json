@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:init": "node src/scripts/init-db.js",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "dependencies": {
     "@types/pg": "^8.23.1",

@@ -15,6 +15,7 @@ interface RawResult {
   rowCount: number | null;
   command: string;
   queryTime: number;
+  truncated?: boolean;
 }
 
 export default function RawSqlTab() {
@@ -39,6 +40,7 @@ export default function RawSqlTab() {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs" style={{color:"var(--text-secondary)"}}>Read-only SQL workspace. Results show up to 100 rows. Use the record forms to make changes.</p>
       {/* Quick snippets */}
       <div>
         <p className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{color:"rgba(34,211,238,0.4)"}}>Quick Snippets</p>
@@ -101,6 +103,7 @@ export default function RawSqlTab() {
               Result · {result.rows.length} rows · {cols.length} cols
             </p>
           </div>
+          {result.truncated && <p className="px-4 py-2 text-xs" style={{color:"var(--text-secondary)"}}>Showing the first 100 rows.</p>}
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>

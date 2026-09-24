@@ -1,47 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stellar Archive DBMS
 
-## Getting Started
+A PostgreSQL database administration project for astronomical records. The Next.js app uses raw, parameterized SQL through `pg` and provides authenticated browsing, schema inspection, and administrator CRUD operations.
 
-First, run the development server:
+## Requirements
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 22 or newer
+- PostgreSQL with a database named `stellar_archive` (or another name in the connection settings)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Run `npm install`.
+2. Copy `.env.local.example` to `.env.local` and set the PostgreSQL credentials, a random `SESSION_SECRET` of at least 32 characters, and an `ADMIN_PASSWORD` of at least 12 characters. Set `VIEWER_PASSWORD` to create a read-only viewer account.
+3. Create the PostgreSQL database if it does not exist. For example, run `createdb stellar_archive` with an account that has database creation rights.
+4. Run `npm run db:init`. This creates missing tables and indexes, seeds sample astronomical data into empty tables, and creates or updates the configured login accounts. It preserves existing celestial bodies and observations. Running it again resets the configured account passwords to the environment values.
+5. Run `npm run dev` and open `http://localhost:3000`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The app also accepts a `DATABASE_URL` connection string instead of separate `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` values.
 
-## Learn More
+## Roles and features
 
-To learn more about Next.js, take a look at the following resources:
+| Role | Capabilities |
+| --- | --- |
+| Administrator (role ID 1) | Browse tables, inspect columns and constraints, insert/update/delete astronomical records, run read-only SQL queries |
+| Viewer (role ID 2) | Browse tables and inspect schema |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The contents API returns 25 rows per page by default, with a maximum page size of 100. User password hashes are never included in table contents. The SQL workspace accepts single read-only queries and shows at most 100 result rows. Deleting a celestial body also deletes linked observations through the database foreign key.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project structure
 
-## Deploy on Vercel
+- `src/scripts/init-db.js`: idempotent schema setup and sample data
+- `src/lib/db.ts`: PostgreSQL connection pool
+- `src/lib/session.ts`: password hashing and signed session cookies
+- `app/api/`: login, logout, read, schema, and modify endpoints
+- `app/dashboard/`: data browser, structure, constraints, and CRUD interface
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Checks
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-backend starting command - 
-node src/scripts/init-db.js
-
-start postgresql -
-
-Press the Windows Key + R to open the Run dialog.
-Type services.msc and hit Enter.
-Scroll down the list until you find PostgreSQL (it usually looks something like postgresql-x64-16 or whichever version you installed).
-Right-click it and select Start (or "Restart" if it seems stuck).
+Run `npm test`, `npm run lint`, `npx tsc --noEmit`, and `npm run build`. Database-backed behavior also requires a running PostgreSQL instance configured through `.env.local`.

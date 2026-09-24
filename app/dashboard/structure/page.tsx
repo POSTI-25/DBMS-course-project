@@ -38,7 +38,8 @@ export default function StructurePage() {
   }, []);
 
   useEffect(() => {
-    fetchStructure(selectedTable);
+    const timer = setTimeout(() => { void fetchStructure(selectedTable); }, 0);
+    return () => clearTimeout(timer);
   }, [selectedTable, fetchStructure]);
 
   return (

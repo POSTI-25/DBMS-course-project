@@ -15,6 +15,7 @@ interface ColumnInfo {
   nullable: string;
   position: number;
 }
+interface TableConstraint { name: string; type: string; definition: string }
 
 const TYPE_COLOR: Record<string, string> = {
   integer: "var(--accent-blue)",
@@ -34,6 +35,7 @@ function getTypeColor(type: string) {
 export default function ConstraintsPage() {
   const [selectedTable, setSelectedTable] = useState<TableName>("celestial_bodies");
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
+  const [constraints, setConstraints] = useState<TableConstraint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +47,7 @@ export default function ConstraintsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to fetch");
       setColumns(json.columns);
+      setConstraints(json.constraints ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -53,7 +56,8 @@ export default function ConstraintsPage() {
   }, []);
 
   useEffect(() => {
-    fetchConstraints(selectedTable);
+    const timer = setTimeout(() => { void fetchConstraints(selectedTable); }, 0);
+    return () => clearTimeout(timer);
   }, [selectedTable, fetchConstraints]);
 
   return (
@@ -113,6 +117,8 @@ export default function ConstraintsPage() {
         </div>
       </div>
 
+      {!loading && !error && <section className="glass-card p-5"><h2 className="text-base font-semibold mb-3">Database constraints</h2>{constraints.length === 0 ? <p className="text-sm" style={{color:"var(--text-secondary)"}}>No constraints are defined for this table.</p> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>Name</th><th>Type</th><th>Definition</th></tr></thead><tbody>{constraints.map(item => <tr key={item.name}><td>{item.name}</td><td><span className="badge badge-blue">{item.type}</span></td><td><code className="text-xs whitespace-normal">{item.definition}</code></td></tr>)}</tbody></table></div>}</section>}
+
       {/* Info banner */}
       <div
         className="flex items-start gap-3 p-4 rounded-lg"
@@ -123,10 +129,10 @@ export default function ConstraintsPage() {
       >
         <Info size={16} style={{ color: "var(--accent-blue)", marginTop: "1px", flexShrink: 0 }} />
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          This view shows column-level metadata for the{" "}
+          This view shows database rules and column metadata for the{" "}
           <strong style={{ color: "var(--text-primary)" }}>{selectedTable}</strong> table,
-          including data types, default values, nullability, and character limits sourced
-          directly from the PostgreSQL system catalog.
+          including primary and foreign keys, data types, defaults, and nullability sourced
+          directly from PostgreSQL.
         </p>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, RefreshCw, Trash2, AlertTriangle, X } from "lucide-react";
 import QueryToast, { QueryResult } from "@/components/QueryToast";
 
@@ -12,20 +12,33 @@ export default function DeleteTab({ table }: { table: Table }) {
   const [rows, setRows]         = useState<Record<string,unknown>[]>([]);
   const [loadingRows, setLR]    = useState(false);
   const [selectedPk, setSel]    = useState<string>("");
+  const [lookupId, setLookupId] = useState("");
   const [showModal, setModal]   = useState(false);
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState<QueryResult|null>(null);
 
-  const fetchRows = async () => {
+  const fetchRows = useCallback(async () => {
     setLR(true);
     try {
-      const r = await fetch(`/api/tables/${table}/contents`);
+      const r = await fetch(`/api/tables/${table}/contents?pageSize=100`);
       const j = await r.json();
       setRows(j.rows ?? []);
     } finally { setLR(false); }
-  };
+  }, [table]);
 
-  useEffect(() => { fetchRows(); }, [table]);
+  useEffect(() => { const timer = setTimeout(() => { void fetchRows(); }, 0); return () => clearTimeout(timer); }, [fetchRows]);
+
+  const loadId = async () => {
+    if (!/^\d+$/.test(lookupId) || Number(lookupId) < 1) { setResult({ success:false, message:"Enter a valid record ID." }); return; }
+    try {
+      const response = await fetch(`/api/tables/${table}/contents?id=${lookupId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Lookup failed.");
+      if (!data.rows.length) throw new Error("Record not found.");
+      setRows(previous => [...previous.filter(row => String(row[pkCol]) !== lookupId), data.rows[0]]);
+      setSel(lookupId); setResult(null);
+    } catch (error) { setResult({ success:false, message:error instanceof Error ? error.message : "Lookup failed." }); }
+  };
 
   const selectedRow = rows.find(r=>String(r[pkCol])===selectedPk);
 
@@ -65,6 +78,8 @@ export default function DeleteTab({ table }: { table: Table }) {
           <RefreshCw size={14} className={loadingRows?"animate-spin":""} />
         </button>
       </div>
+
+      <div className="flex gap-2"><input className="stellar-input" aria-label="Load record by ID" type="number" min="1" placeholder="Or enter a record ID" value={lookupId} onChange={e=>setLookupId(e.target.value)} /><button type="button" className="btn-primary" onClick={loadId}>Load ID</button></div>
 
       {/* SQL preview */}
       <div className="p-3 rounded-lg" style={{background:"rgba(239,68,68,0.04)",border:"1px solid rgba(239,68,68,0.15)"}}>
@@ -128,6 +143,7 @@ export default function DeleteTab({ table }: { table: Table }) {
             <p className="text-sm mb-4" style={{color:"var(--text-secondary)"}}>
               You are about to permanently delete record <strong style={{color:"#f87171"}}>{pkCol} = {selectedPk}</strong> from <strong style={{color:"var(--accent-cyan)"}}>{table}</strong>.
             </p>
+            {table === "celestial_bodies" && <p className="text-sm mb-4" style={{color:"#fca5a5"}}>Linked observations will also be deleted.</p>}
             <div className="flex gap-3">
               <button onClick={doDelete} className="btn-danger flex-1" style={{justifyContent:"center",padding:"10px"}}>
                 <Trash2 size={14}/> Confirm DELETE

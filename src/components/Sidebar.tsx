@@ -29,13 +29,13 @@ const TABLE_LINKS = [
   { href: "/dashboard/contents?table=observations",      label: "observations",     icon: Telescope},
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ roleId }: { roleId: number }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
-      className="relative flex flex-col transition-all duration-300 ease-in-out hud-scanline"
+      className="sidebar-shell relative flex flex-col transition-all duration-300 ease-in-out hud-scanline"
       style={{
         width: collapsed ? "64px" : "248px",
         minHeight: "calc(100vh - 57px)",
@@ -75,7 +75,7 @@ export default function Sidebar() {
       <button
         onClick={() => setCollapsed(!collapsed)}
         id="btn-sidebar-toggle"
-        className="absolute -right-3.5 top-6 w-7 h-7 rounded-full flex items-center justify-center z-30 transition-all duration-200"
+        className="sidebar-toggle absolute -right-3.5 top-6 w-7 h-7 rounded-full flex items-center justify-center z-30 transition-all duration-200"
         style={{
           background: "rgba(6,9,24,0.95)",
           border: "1px solid rgba(34,211,238,0.3)",
@@ -88,7 +88,7 @@ export default function Sidebar() {
       </button>
 
       {/* ── Nav ─────────────────────────────── */}
-      <nav className="flex flex-col gap-1 p-3 pt-5">
+      <nav className="sidebar-nav flex flex-col gap-1 p-3 pt-5">
         {!collapsed && (
           <p
             className="text-[9px] font-bold uppercase tracking-[0.2em] mb-2 px-3"
@@ -98,7 +98,7 @@ export default function Sidebar() {
           </p>
         )}
 
-        {NAV_ITEMS.map(({ href, label, icon: Icon, description }) => {
+        {NAV_ITEMS.filter(item => roleId === 1 || item.href !== "/dashboard/modify").map(({ href, label, icon: Icon, description }) => {
           const isActive = pathname === href || pathname.startsWith(href);
           return (
             <Link
@@ -193,7 +193,7 @@ export default function Sidebar() {
               </p>
             </div>
             <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-              PostgreSQL v16 · 3 tables
+              PostgreSQL · 3 tables
             </p>
           </div>
         </div>
