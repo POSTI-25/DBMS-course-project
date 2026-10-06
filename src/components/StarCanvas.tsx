@@ -73,9 +73,13 @@ export default function StarCanvas() {
       }
       if (!still) {
         if (time > nextMeteor) {
-          const leftToRight = Math.random() < .5;
-          meteors.push({ x: Math.random() * width, y: Math.random() * height * .8,
-            angle: leftToRight ? .3 + Math.random() * .5 : Math.PI + .3 + Math.random() * .5,
+          const edge = Math.floor(Math.random() * 4);
+          const x = edge === 0 ? -30 : edge === 1 ? width + 30 : Math.random() * width;
+          const y = edge === 2 ? -30 : edge === 3 ? height + 30 : Math.random() * height;
+          const targetX = width * (.2 + Math.random() * .6);
+          const targetY = height * (.2 + Math.random() * .6);
+          meteors.push({ x, y,
+            angle: Math.atan2(targetY - y, targetX - x),
             length: 85 + Math.random() * 160, born: time,
             duration: 700 + Math.random() * 650, speed: 350 + Math.random() * 370 });
           nextMeteor = time + 1200 + Math.random() * 3200;
