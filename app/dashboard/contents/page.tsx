@@ -36,11 +36,8 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
-function ContentsInner() {
-  const searchParams = useSearchParams();
+function ContentsInner({ selectedTable }: { selectedTable: TableName }) {
   const router = useRouter();
-  const requestedTable = searchParams.get("table");
-  const selectedTable: TableName = TABLES.includes(requestedTable as TableName) ? requestedTable as TableName : "celestial_bodies";
   const [page, setPage] = useState(1);
   const [data, setData]         = useState<TableData | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -245,7 +242,7 @@ function ContentsInner() {
                     const isSelected = activeRow === row;
                     return (
                       <tr
-                        key={String(row[selectedTable === "users" ? "user_id" : selectedTable === "observations" ? "obs_id" : "body_id"])}
+                        key={`${selectedTable}:${String(row[selectedTable === "users" ? "user_id" : selectedTable === "observations" ? "obs_id" : "body_id"])}`}
                         onClick={() => setActiveRow(isSelected ? null : row)}
                         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveRow(isSelected ? null : row); } }}
                         tabIndex={0}
@@ -317,10 +314,20 @@ function ContentsInner() {
   );
 }
 
+function ContentsRoute() {
+  const requestedTable = useSearchParams().get("table");
+  const selectedTable: TableName = TABLES.includes(requestedTable as TableName)
+    ? requestedTable as TableName
+    : "celestial_bodies";
+
+  // Route changes must reset rows, pagination, and selection together.
+  return <ContentsInner key={selectedTable} selectedTable={selectedTable} />;
+}
+
 export default function ContentsPage() {
   return (
     <Suspense>
-      <ContentsInner />
+      <ContentsRoute />
     </Suspense>
   );
 }
